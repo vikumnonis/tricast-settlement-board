@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tricast Settlement Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --turf:#0F3D2E; --turf-dark:#0A2B20; --chalk:#F6F2E7;
+    --brass:#C9A15B; --rail:#9C3B3B; --win:#4C8B5E; --warn:#C97A3A;
+    --line: rgba(246,242,231,0.14);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--turf-dark);
+    background-image:
+      radial-gradient(ellipse at top left, rgba(201,161,91,0.08), transparent 55%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+    color:var(--chalk); font-family:'Inter', sans-serif;
+    min-height:100vh; padding:28px 16px 60px;
+  }
+  .wrap{max-width:800px;margin:0 auto;}
+  header{margin-bottom:24px;}
+  .eyebrow{font-family:'DM Mono', monospace; font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color:var(--brass); margin-bottom:8px;}
+  h1{font-family:'Fraunces', serif; font-weight:700; font-size:clamp(28px,6vw,40px); line-height:1.05; margin:0 0 10px;}
+  .sub{font-size:14px; color:rgba(246,242,231,0.72); max-width:60ch; line-height:1.55;}
+
+  .panel{background:var(--turf); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:16px;}
+  .panel-title{font-family:'DM Mono', monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--brass); margin:0 0 4px;}
+  .panel-sub{font-size:12.5px; color:rgba(246,242,231,0.55); margin-bottom:14px;}
+
+  .row{display:flex; flex-wrap:wrap; gap:20px; align-items:flex-end; margin-bottom:14px;}
+  .field label{display:block; font-size:12px; color:rgba(246,242,231,0.65); margin-bottom:6px;}
+  .stepper{display:flex; align-items:center; gap:10px;}
+  .stepper button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--turf-dark);color:var(--chalk);font-size:15px;cursor:pointer;line-height:1;}
+  .stepper button:hover{border-color:var(--brass); color:var(--brass);}
+  .stepper .val{font-family:'Fraunces', serif; font-size:20px; min-width:26px; text-align:center;}
+
+  .toggle{display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .toggle button{padding:8px 14px;background:transparent;border:none;color:rgba(246,242,231,0.65);font-family:'Inter';font-size:12.5px;font-weight:600;cursor:pointer;}
+  .toggle button.active{background:var(--brass); color:var(--turf-dark);}
+
+  .runners{display:flex; flex-wrap:wrap; gap:8px; margin-top:2px;}
+  .runner-chip{
+    width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);
+    background:var(--turf-dark);color:rgba(246,242,231,0.75);font-family:'DM Mono';font-size:13px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.12s ease;
+  }
+  .runner-chip:hover{border-color:var(--brass); color:var(--brass);}
+
+  .manual-add{display:flex; gap:8px; align-items:center; margin-top:10px;}
+  .manual-add input{
+    width:90px; background:var(--turf-dark); border:1px solid var(--line); border-radius:6px;
+    color:var(--chalk); font-family:'DM Mono'; font-size:13px; padding:7px 10px;
+  }
+  .manual-add input:focus{outline:none; border-color:var(--brass);}
+  .manual-add button{
+    background:transparent; border:1px solid var(--brass); color:var(--brass);
+    border-radius:6px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer; font-family:'Inter';
+  }
+  .manual-add button:hover{background:var(--brass); color:var(--turf-dark);}
+  .manual-add .note{font-size:11px; color:rgba(246,242,231,0.4);}
+
+  .tags{display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; min-height:20px;}
+
+  .result-boxes{display:flex; gap:14px; margin-top:14px; flex-wrap:wrap;}
+  .result-box{display:flex; flex-direction:column; align-items:center; gap:7px;}
+  .result-box .rb-label{
+    font-family:'DM Mono', monospace; font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase;
+    color:rgba(246,242,231,0.55);
+  }
+  .result-box:nth-child(1) .rb-label{color:var(--brass);}
+  .result-box .rb-slot{
+    width:64px; height:64px; border-radius:10px;
+    border:2px dashed var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Fraunces', serif; font-weight:700; font-size:26px;
+    color:rgba(246,242,231,0.3);
+    cursor:default;
+    position:relative;
+  }
+  .result-box .rb-slot.filled{
+    border-style:solid; border-color:var(--brass);
+    background:rgba(201,161,91,0.12); color:var(--chalk);
+    cursor:pointer;
+  }
+  .result-box .rb-slot.filled:hover{background:rgba(201,161,91,0.22);}
+  .result-box .rb-slot.dup{border-color:var(--warn); background:rgba(201,122,58,0.16); color:var(--warn);}
+  .result-box .rb-slot.invalid{border-color:var(--rail); background:rgba(156,59,59,0.16); color:var(--rail);}
+  .result-box .rb-flag{
+    position:absolute; bottom:-8px; font-size:8.5px; letter-spacing:0.05em; text-transform:uppercase;
+    font-family:'DM Mono'; background:var(--turf-dark); padding:1px 5px; border-radius:4px;
+  }
+  .result-box .rb-slot.dup .rb-flag{color:var(--warn);}
+  .result-box .rb-slot.invalid .rb-flag{color:var(--rail);}
+  .result-box .rb-clear{font-size:10px; color:rgba(246,242,231,0.35);}
+  .tag{
+    display:flex; align-items:center; gap:6px;
+    font-family:'DM Mono'; font-size:12.5px;
+    border-radius:16px; padding:5px 6px 5px 12px;
+    border:1.5px solid var(--line); background:var(--turf-dark); color:var(--chalk);
+  }
+  .tag.ok{border-color:rgba(201,161,91,0.5);}
+  .tag.dup{border-color:var(--warn); background:rgba(201,122,58,0.15);}
+  .tag.invalid{border-color:var(--rail); background:rgba(156,59,59,0.18);}
+  .tag .flag{font-size:9.5px; text-transform:uppercase; letter-spacing:0.06em; opacity:0.8;}
+  .tag.dup .flag{color:var(--warn);}
+  .tag.invalid .flag{color:var(--rail);}
+  .tag .rm{
+    width:16px;height:16px;border-radius:50%;background:rgba(246,242,231,0.12);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10px;line-height:1;
+  }
+  .tag .rm:hover{background:rgba(246,242,231,0.25);}
+  .hint{font-size:12px; color:rgba(246,242,231,0.5); margin-top:10px;}
+
+  .settlement{display:flex; flex-direction:column; gap:8px; border-radius:8px; padding:16px 18px;}
+  .settlement.win{background:rgba(76,139,94,0.18); border:1px solid rgba(76,139,94,0.5);}
+  .settlement.lose{background:rgba(156,59,59,0.16); border:1px solid rgba(156,59,59,0.45);}
+  .settlement.void{background:rgba(201,122,58,0.16); border:1px solid rgba(201,122,58,0.5);}
+  .settlement.pending{background:rgba(246,242,231,0.06); border:1px solid var(--line);}
+  .settlement .status{font-family:'Fraunces', serif; font-weight:700; font-size:22px;}
+  .settlement.win .status{color:var(--win);}
+  .settlement.lose .status{color:var(--rail);}
+  .settlement.void .status{color:var(--warn);}
+  .settlement.pending .status{color:rgba(246,242,231,0.5); font-size:16px;}
+  .settlement .detail{font-size:13px; color:rgba(246,242,231,0.8); line-height:1.55;}
+  .settlement .detail b{color:var(--chalk);}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:8px; margin-top:14px;}
+  .ticket{background:var(--turf-dark); border:1px solid var(--line); border-radius:7px; padding:9px 10px; font-family:'DM Mono', monospace; font-size:12px; display:flex; align-items:center; gap:5px;}
+  .ticket .lineno{color:rgba(246,242,231,0.4); font-size:10.5px; min-width:16px; flex-shrink:0;}
+  .ticket.match{border-color:var(--win); background:rgba(76,139,94,0.15);}
+  .ticket.inv-wrong{border-color:var(--rail); background:rgba(156,59,59,0.12); opacity:0.85;}
+  .ticket.inv-dup{border-color:var(--warn); background:rgba(201,122,58,0.12); opacity:0.85;}
+  .ticket .slot{width:19px;height:19px;border-radius:50%;background:rgba(246,242,231,0.16);color:var(--chalk);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:10.5px;flex-shrink:0;}
+  .ticket.match .slot{background:var(--win); color:var(--turf-dark);}
+  .ticket.inv-wrong .slot{background:var(--rail); color:#fff;}
+  .ticket.inv-dup .slot{background:var(--warn); color:#fff;}
+  .ticket .arrow{color:rgba(246,242,231,0.35); font-size:10px;}
+  .ticket .tag-note{font-size:9.5px; text-transform:uppercase; letter-spacing:0.04em; margin-left:auto; padding-left:6px; flex-shrink:0;}
+  .ticket.inv-wrong .tag-note{color:var(--rail);}
+  .ticket.inv-dup .tag-note{color:var(--warn);}
+  .more{grid-column:1/-1; text-align:center; padding:8px; font-size:12px; color:rgba(246,242,231,0.45); font-family:'DM Mono';}
+  .summary-row{grid-column:1/-1; display:flex; gap:18px; flex-wrap:wrap; margin-top:4px; padding-top:12px; border-top:1px solid var(--line);}
+  .summary-item{font-family:'DM Mono', monospace; font-size:12px;}
+  .summary-item .n{font-family:'Fraunces', serif; font-size:20px; font-weight:700; margin-right:5px;}
+  .summary-item.valid .n{color:var(--win);}
+  .summary-item.wrong .n{color:var(--rail);}
+  .summary-item.dup .n{color:var(--warn);}
+
+  .legend{display:flex; gap:16px; margin-top:12px; flex-wrap:wrap;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:11.5px; color:rgba(246,242,231,0.6);}
+  .legend-dot{width:10px;height:10px;border-radius:50%; border:1.5px solid;}
+
+  footer{text-align:center; font-size:11.5px; color:rgba(246,242,231,0.4); margin-top:22px; font-family:'DM Mono', monospace; line-height:1.7;}
+  footer .credit{color:rgba(246,242,231,0.6); font-weight:500;}
+  footer .disclaimer{
+    display:block;
+    max-width:52ch; margin:10px auto 0;
+    color:var(--warn);
+    font-size:11px;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Betting Settlement — Reference Tool</div>
+    <h1>Tricast Settlement Board</h1>
+    <p class="sub">Set your selections, enter the result — and see how the board handles a slip with a repeated number or a runner that doesn't exist in the race.</p>
+  </header>
+
+  <div class="panel">
+    <div class="panel-title">1 · Your selections</div>
+    <div class="panel-sub">Tap a runner to add it — tap the same one twice to test a duplicate. Use "add number" to test a runner that isn't in this race.</div>
+    <div class="row">
+      <div class="field">
+        <label>Runners in the race</label>
+        <div class="stepper">
+          <button id="minus">−</button>
+          <span class="val" id="runnerCount">6</span>
+          <button id="plus">+</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Bet type</label>
+        <div class="toggle" id="betToggle">
+          <button data-mode="straight" class="active">Straight Tricast</button>
+          <button data-mode="combo">Combination Tricast</button>
+        </div>
+      </div>
+    </div>
+    <div class="runners" id="selRunners"></div>
+    <div class="manual-add">
+      <input type="number" id="selManualInput" placeholder="e.g. 10">
+      <button id="selManualAdd">Add number</button>
+      <span class="note">tests wrong / out-of-range numbers</span>
+    </div>
+    <div class="tags" id="selTags"></div>
+    <div class="hint" id="selHint"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">2 · Actual race result</div>
+    <div class="panel-sub">Tap or type runners — each tap fills the next box: Win, then 2nd, then 3rd. Click a filled box to clear it.</div>
+    <div class="runners" id="resRunners"></div>
+    <div class="manual-add">
+      <input type="number" id="resManualInput" placeholder="e.g. 10">
+      <button id="resManualAdd">Add number</button>
+      <span class="note">tests wrong / out-of-range numbers</span>
+    </div>
+    <div class="result-boxes" id="resultBoxes"></div>
+    <div class="hint" id="resHint"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">3 · Settlement</div>
+    <div class="settlement pending" id="settlementBox"><div class="status">Waiting on selections and result…</div></div>
+    <div class="grid" id="ticketGrid"></div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot" style="border-color:var(--win); background:rgba(76,139,94,0.25);"></span> Winning line</div>
+      <div class="legend-item"><span class="legend-dot" style="border-color:rgba(201,161,91,0.5); background:transparent;"></span> Valid, non-winning line</div>
+      <div class="legend-item"><span class="legend-dot" style="border-color:var(--warn); background:rgba(201,122,58,0.3);"></span> Invalid — same horse twice in one line</div>
+      <div class="legend-item"><span class="legend-dot" style="border-color:var(--rail); background:rgba(156,59,59,0.3);"></span> Invalid — runner not in this race</div>
+    </div>
+  </div>
+
+  <footer>
+    Duplicate or out-of-range entries void the affected line — stake on that line is returned, valid lines settle as normal
+    <span class="disclaimer">Built for educational purposes only, not a substitute for official settlement rules. It may contain mistakes — always verify against your company's settlement policy before relying on it.</span>
+    <span class="credit">Developed by Vikum Nonis</span>
+  </footer>
+</div>
+
+<script>
+const state = {
+  runnerCount: 6,
+  mode: 'straight',
+  selection: [],   // raw entries in order added (numbers, possibly invalid/duplicate)
+  result: []
+};
+
+function permutations3(arr){
+  const out=[];
+  for(let i=0;i<arr.length;i++)
+    for(let j=0;j<arr.length;j++){
+      if(j===i) continue;
+      for(let k=0;k<arr.length;k++){
+        if(k===i||k===j) continue;
+        out.push([arr[i],arr[j],arr[k]]);
+      }
+    }
+  return out;
+}
+function sameOrder(a,b){ return a.length===b.length && a.every((v,i)=>v===b[i]); }
+
+// permutations of length k, picking distinct TOKEN POSITIONS (indices) from n tokens.
+// keeping positions distinct (not values) means a duplicate value like [2,2,4] still
+// produces lines pairing "2 with itself" so we can flag them as invalid.
+function permuteIndices(n, k){
+  const idxs=[...Array(n).keys()];
+  function build(arr, k){
+    if(k===1) return arr.map(v=>[v]);
+    let out=[];
+    arr.forEach((v,i)=>{
+      const rest=arr.slice(0,i).concat(arr.slice(i+1));
+      build(rest,k-1).forEach(p=>out.push([v,...p]));
+    });
+    return out;
+  }
+  return build(idxs,k);
+}
+
+// classify each raw entry: 'invalid' (out of range), 'dup' (repeat of an earlier ok/dup value), or 'ok'
+function classify(list, runnerCount){
+  const seen = new Set();
+  return list.map(v=>{
+    const n = Number(v);
+    if(!Number.isInteger(n) || n<1 || n>runnerCount) return {value:v, flag:'invalid'};
+    if(seen.has(n)) return {value:n, flag:'dup'};
+    seen.add(n);
+    return {value:n, flag:'ok'};
+  });
+}
+
+function renderRunnerRow(container, onClick){
+  container.innerHTML='';
+  for(let n=1;n<=state.runnerCount;n++){
+    const chip=document.createElement('div');
+    chip.className='runner-chip';
+    chip.textContent=n;
+    chip.addEventListener('click',()=>onClick(n));
+    container.appendChild(chip);
+  }
+}
+
+function renderResultBoxes(){
+  const container=document.getElementById('resultBoxes');
+  container.innerHTML='';
+  const classified = classify(state.result, state.runnerCount);
+  const labels=['Win','2nd','3rd'];
+  labels.forEach((label,i)=>{
+    const box=document.createElement('div');
+    box.className='result-box';
+    const c = classified[i];
+    const filled = c !== undefined;
+    const slotClass = !filled ? '' : (c.flag==='invalid' ? 'filled invalid' : (c.flag==='dup' ? 'filled dup' : 'filled'));
+    const flagNote = filled && c.flag==='invalid' ? '<span class="rb-flag">wrong</span>' : (filled && c.flag==='dup' ? '<span class="rb-flag">dup</span>' : '');
+    box.innerHTML = `
+      <div class="rb-label">${label}</div>
+      <div class="rb-slot ${slotClass}">${filled ? c.value : ''}${flagNote}</div>
+    `;
+    if(filled){
+      box.querySelector('.rb-slot').addEventListener('click', () => { state.result.splice(i,1); render(); });
+    }
+    container.appendChild(box);
+  });
+}
+
+function renderTags(container, list, runnerCount, removeFn){
+  container.innerHTML='';
+  const classified = classify(list, runnerCount);
+  classified.forEach((c,idx)=>{
+    const tag=document.createElement('div');
+    tag.className='tag '+c.flag;
+    const label = c.flag==='invalid' ? `${c.value} <span class="flag">wrong</span>` : (c.flag==='dup' ? `${c.value} <span class="flag">dup</span>` : `${c.value}`);
+    tag.innerHTML = `<span>${label}</span><span class="rm">✕</span>`;
+    tag.querySelector('.rm').addEventListener('click',()=>removeFn(idx));
+    container.appendChild(tag);
+  });
+  return classified;
+}
+
+function addSelection(n){
+  const cap = state.mode==='straight' ? 3 : 99;
+  if(state.selection.length>=cap) return;
+  state.selection.push(n);
+  render();
+}
+function addResult(n){
+  if(state.result.length>=3) return;
+  state.result.push(n);
+  render();
+}
+function removeSelection(idx){ state.selection.splice(idx,1); render(); }
+function removeResult(idx){ state.result.splice(idx,1); render(); }
+
+function render(){
+  document.getElementById('runnerCount').textContent=state.runnerCount;
+  renderRunnerRow(document.getElementById('selRunners'), addSelection);
+  renderRunnerRow(document.getElementById('resRunners'), addResult);
+
+  const selClassified = renderTags(document.getElementById('selTags'), state.selection, state.runnerCount, removeSelection);
+  renderResultBoxes();
+  const resClassified = classify(state.result, state.runnerCount);
+
+  const selHint=document.getElementById('selHint');
+  if(state.mode==='straight'){
+    selHint.textContent = state.selection.length<3 ? `Add ${3-state.selection.length} more, in the order you want them to finish.` : `Your line, as entered: ${state.selection.join(' → ')}`;
+  } else {
+    selHint.textContent = state.selection.length<3 ? `Box at least 3 runners (order doesn't matter for a combination).` : `Boxed as entered: ${state.selection.join(', ')}`;
+  }
+  document.getElementById('resHint').textContent = state.result.length<3 ? `Fill ${3-state.result.length} more box${3-state.result.length===1?'':'es'} to complete the result.` : '';
+
+  renderSettlement(selClassified, resClassified);
+}
+
+function renderSettlement(selClassified, resClassified){
+  const box=document.getElementById('settlementBox');
+  const grid=document.getElementById('ticketGrid');
+  grid.innerHTML='';
+
+  const selReady = state.mode==='straight' ? state.selection.length===3 : state.selection.length>=3;
+  const resReady = state.result.length===3;
+  if(!selReady || !resReady){
+    box.className='settlement pending';
+    box.innerHTML=`<div class="status">Waiting on selections and result…</div>`;
+    return;
+  }
+
+  const resHasError = resClassified.some(c=>c.flag!=='ok');
+  if(resHasError){
+    box.className='settlement void';
+    const bad = resClassified.filter(c=>c.flag!=='ok').map(c=>`${c.value} (${c.flag==='invalid'?'not in this race':'repeated'})`).join(', ');
+    box.innerHTML = `<div class="status">RESULT INVALID</div><div class="detail">The entered result contains an error — <b>${bad}</b>. A race can't finish with a repeated or non-existent runner, so this can't be settled until it's corrected.</div>`;
+    return;
+  }
+  const result = resClassified.map(c=>c.value);
+
+  if(state.mode==='straight'){
+    const hasError = selClassified.some(c=>c.flag!=='ok');
+    if(hasError){
+      const bad = selClassified.filter(c=>c.flag!=='ok').map(c=>`${c.value} (${c.flag==='invalid'?'not in this race':'repeated'})`).join(', ');
+      box.className='settlement void';
+      box.innerHTML = `<div class="status">VOID · RETURNED</div><div class="detail">This line has an invalid entry — <b>${bad}</b>. A straight Tricast needs three distinct, real runners in a set order. The line can't stand, so the stake is returned in full.</div>`;
+      const ticket=document.createElement('div');
+      ticket.className='ticket';
+      ticket.innerHTML = `<span class="lineno">1.</span>` + selClassified.map((c,i)=>`<span class="slot" style="${c.flag!=='ok'?'background:var(--rail);color:#fff;':''}">${c.value}</span>${i<2?'<span class="arrow">→</span>':''}`).join('');
+      grid.appendChild(ticket);
+      return;
+    }
+    const line = selClassified.map(c=>c.value);
+    const isWin = sameOrder(line, result);
+    box.className='settlement '+(isWin?'win':'lose');
+    box.innerHTML = isWin
+      ? `<div class="status">WINS</div><div class="detail">Your line ${line.join(' → ')} matches the result exactly.</div>`
+      : `<div class="status">LOSES</div><div class="detail">You backed ${line.join(' → ')}. The race finished ${result.join(' → ')} — order doesn't match, so the line loses.</div>`;
+    const ticket=document.createElement('div');
+    ticket.className='ticket'+(isWin?' match':'');
+    ticket.innerHTML=`<span class="lineno">1.</span>`+line.map((n,i)=>`<span class="slot">${n}</span>${i<2?'<span class="arrow">→</span>':''}`).join('');
+    grid.appendChild(ticket);
+
+  } else {
+    // combination: build every ordered line from the RAW tokens (so a duplicate
+    // number like 2,2,4,6 still produces lines that pair "2 with itself" —
+    // those get flagged invalid rather than silently dropped).
+    const tokens = selClassified; // [{value, flag:'ok'|'invalid'}] in entry order
+    const n = tokens.length;
+
+    if(n<3){
+      box.className='settlement void';
+      box.innerHTML = `<div class="status">VOID · RETURNED</div><div class="detail">Only ${n} runner${n===1?'':'s'} entered — a combination needs at least 3. Full stake returned.</div>`;
+      return;
+    }
+
+    const idxLines = permuteIndices(n,3);
+    const lines = idxLines.map(idxs => idxs.map(i=>tokens[i]));
+
+    let validCount=0, wrongCount=0, dupCount=0;
+    const evaluated = lines.map(line=>{
+      const hasWrong = line.some(t=>t.flag==='invalid');
+      const values = line.map(t=>t.value);
+      const hasSameHorseTwice = !hasWrong && new Set(values).size < values.length;
+      let status = 'valid';
+      if(hasWrong){ status='wrong'; wrongCount++; }
+      else if(hasSameHorseTwice){ status='dup'; dupCount++; }
+      else { validCount++; }
+      return {values, status};
+    });
+
+    // Show every raw line: n runners entered → n×(n-1)×(n-2) lines, always —
+    // including duplicate-value lines that pair the same horse with itself (invalid).
+    const displayLines = evaluated;
+    const validUniqueLines = evaluated.filter(e=>e.status==='valid').map(e=>e.values);
+    const resultMatches = validUniqueLines.some(line=>sameOrder(line, result));
+
+    // organize first: sort every line numerically (1-2-3, 1-2-4, 1-3-2 …) so the
+    // sheet reads in a fixed, predictable order — THEN apply win/void highlighting on top.
+    displayLines.sort((a,b)=>{
+      for(let i=0;i<3;i++){
+        if(a.values[i]!==b.values[i]) return a.values[i]-b.values[i];
+      }
+      return 0;
+    });
+
+    box.className='settlement '+(resultMatches?'win':'lose');
+    let detail = resultMatches
+      ? `The result ${result.join(' → ')} is one of your valid combination lines — this settles as a winner.`
+      : `The result ${result.join(' → ')} does not match any valid line in your combination — this settles as a loser.`;
+    if(wrongCount || dupCount){
+      const parts=[];
+      if(wrongCount) parts.push(`${wrongCount} line${wrongCount===1?'':'s'} voided for an out-of-race runner`);
+      if(dupCount) parts.push(`${dupCount} line${dupCount===1?'':'s'} voided for pairing the same horse with itself`);
+      detail += ` ${parts.join(' and ')} — stake on those specific lines is returned; the rest of the combination stands.`;
+    }
+    box.innerHTML = `<div class="status">${resultMatches?'WINS':'LOSES'}</div><div class="detail">${detail}</div>`;
+
+    const showLimit=60;
+    displayLines.slice(0,showLimit).forEach((e,idx)=>{
+      const isMatch = e.status==='valid' && sameOrder(e.values, result);
+      const cls = e.status==='wrong' ? 'inv-wrong' : (e.status==='dup' ? 'inv-dup' : (isMatch?'match':''));
+      const noteLabel = e.status==='wrong' ? 'wrong #' : (e.status==='dup' ? 'same horse' : '');
+      const ticket=document.createElement('div');
+      ticket.className='ticket'+(cls?' '+cls:'');
+      ticket.innerHTML = `<span class="lineno">${idx+1}.</span>` + e.values.map((n,i)=>`<span class="slot">${n}</span>${i<2?'<span class="arrow">→</span>':''}`).join('')
+        + (noteLabel ? `<span class="tag-note">${noteLabel}</span>` : '');
+      grid.appendChild(ticket);
+    });
+    if(displayLines.length>showLimit){
+      const more=document.createElement('div');
+      more.className='more';
+      more.textContent=`+ ${displayLines.length-showLimit} more lines not shown`;
+      grid.appendChild(more);
+    }
+
+    const summary=document.createElement('div');
+    summary.className='summary-row';
+    summary.innerHTML = `
+      <div class="summary-item"><span class="n">${displayLines.length}</span>total lines</div>
+      <div class="summary-item valid"><span class="n">${validUniqueLines.length}</span>valid lines</div>
+      <div class="summary-item dup"><span class="n">${dupCount}</span>voided · same horse twice</div>
+      <div class="summary-item wrong"><span class="n">${wrongCount}</span>voided · wrong number</div>
+    `;
+    grid.appendChild(summary);
+  }
+}
+
+document.getElementById('minus').addEventListener('click',()=>{
+  if(state.runnerCount>3){ state.runnerCount--; render(); }
+});
+document.getElementById('plus').addEventListener('click',()=>{
+  if(state.runnerCount<20){ state.runnerCount++; render(); }
+});
+document.getElementById('betToggle').addEventListener('click',(e)=>{
+  const btn=e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#betToggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  state.mode=btn.dataset.mode;
+  render();
+});
+document.getElementById('selManualAdd').addEventListener('click',()=>{
+  const input=document.getElementById('selManualInput');
+  if(input.value==='') return;
+  const cap = state.mode==='straight' ? 3 : 99;
+  if(state.selection.length>=cap) return;
+  state.selection.push(Number(input.value));
+  input.value='';
+  render();
+});
+document.getElementById('resManualAdd').addEventListener('click',()=>{
+  const input=document.getElementById('resManualInput');
+  if(input.value==='' || state.result.length>=3) return;
+  state.result.push(Number(input.value));
+  input.value='';
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
